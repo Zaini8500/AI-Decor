@@ -32,8 +32,11 @@ export async function POST(req) {
         },
       ],
       mode: "payment",
-      success_url: `http://localhost:3000/dashboard?success=true&credits=${credits}`, // ✅ Return credit count for success handling
-      cancel_url: `http://localhost:3000/dashboard?canceled=true`,
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+
+success_url: `${baseUrl}/dashboard?success=true&credits=${credits}`,
+cancel_url: `${baseUrl}/dashboard?canceled=true`,
+
     });
 
     console.log("✅ Stripe session created:", session.id);
