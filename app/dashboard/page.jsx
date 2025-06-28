@@ -1,4 +1,6 @@
 "use client";
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -9,9 +11,10 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const [credits, setCredits] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -19,39 +22,58 @@ export default function DashboardPage() {
       return;
     }
 
-    const fetchCredits = async () => {
-      const res = await fetch("/api/user-credits");
-      const data = await res.json();
-      setCredits(data.credits || 0);
-      setLoading(false);
-    };
+    if (status !== "authenticated") return;
 
-    const fetchHistory = async () => {
-      const res = await fetch("/api/design-history");
-      const data = await res.json();
-      setHistory(data || []);
-    };
+    const fetchData = async () => {
+      try {
+        const success = searchParams.get("success");
+        const newCredits = searchParams.get("credits");
 
-    if (status === "authenticated" && session?.user?.email) {
-      const success = searchParams.get("success");
-      const newCredits = searchParams.get("credits");
+        if (success && newCredits && session?.user?.email) {
+          const creditsToAdd = parseInt(newCredits);
 
-      if (success && newCredits) {
-        fetch("/api/update-credits", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credits: parseInt(newCredits) }),
-        }).then(() => {
-          fetchCredits();
-          fetchHistory();
+          // 1. Update credits
+          await fetch("/api/update-credits", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ credits: creditsToAdd }),
+          });
+
+          // 2. Save payment
+          await fetch("/api/save-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: session.user.email,
+              credits: creditsToAdd,
+              amount: creditsToAdd * 1, // $1 per credit
+            }),
+          });
+
+          // Remove query string
           router.replace("/dashboard");
-        });
-      } else {
-        fetchCredits();
-        fetchHistory();
+        }
+
+        // Always fetch credits & history
+        const [creditsRes, historyRes] = await Promise.all([
+          fetch("/api/user-credits"),
+          fetch("/api/design-history"),
+        ]);
+
+        const creditsData = await creditsRes.json();
+        const historyData = await historyRes.json();
+
+        setCredits(creditsData.credits || 0);
+        setHistory(historyData || []);
+      } catch (err) {
+        console.error("Dashboard error:", err);
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [status]);
+    };
+
+    fetchData();
+  }, [status, session]);
 
   const handleDownload = (url) => {
     const link = document.createElement("a");
@@ -64,7 +86,7 @@ export default function DashboardPage() {
     window.open(url, "_blank");
   };
 
-  if (loading || status === "loading") {
+  if (status === "loading" || loading) {
     return <p className="text-center mt-10">Loading your dashboard...</p>;
   }
 
@@ -72,7 +94,7 @@ export default function DashboardPage() {
     <div className="max-w-7xl mx-auto p-6 space-y-10">
       <div className="text-center">
         <h1 className="text-3xl font-bold">
-          Hello, {session?.user?.name || "Guest"}
+          Hello, {session?.user?.name?.split(" ")[0] || "Guest"}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           You have <span className="font-semibold">{credits}</span> credits
@@ -95,7 +117,9 @@ export default function DashboardPage() {
           className="mt-4 px-6 py-2 text-white text-sm font-semibold"
           style={{ backgroundColor: "oklch(55.8% 0.288 302.321)" }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#000")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "oklch(55.8% 0.288 302.321)")}
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "oklch(55.8% 0.288 302.321)")
+          }
         >
           + Interior Redesign
         </Button>

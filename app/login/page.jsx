@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import toast from "react-hot-toast"; // ✅ only toast, no Toaster
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,7 +14,21 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const handleLogin = async () => {
+    toast.dismiss();
+
+    if (!emailRegex.test(email)) {
+      toast.error("❌ Please enter a valid email address");
+      return;
+    }
+
+    if (!password.trim()) {
+      toast.error("❌ Password is required");
+      return;
+    }
+
     setLoading(true);
     const res = await signIn("credentials", {
       email,
@@ -23,10 +37,12 @@ export default function LoginPage() {
     });
 
     if (res?.error) {
-      toast.error("Invalid email or password");
+      toast.error("❌ Invalid email or password");
     } else {
+      toast.success("✅ Login successful");
       router.push("/dashboard");
     }
+
     setLoading(false);
   };
 
@@ -45,11 +61,21 @@ export default function LoginPage() {
 
       {/* Form */}
       <div className="flex-1 flex flex-col items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
-          <h1 className="text-3xl font-bold text-center mb-6" style={{ color: "oklch(55.8% 0.288 302.321)" }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleLogin();
+          }}
+          className="max-w-md w-full bg-white rounded-xl shadow-lg p-8"
+        >
+          <h1
+            className="text-3xl font-bold text-center mb-6"
+            style={{ color: "oklch(55.8% 0.288 302.321)" }}
+          >
             Welcome back
           </h1>
 
+          {/* Email */}
           <input
             type="email"
             placeholder="Email address"
@@ -59,6 +85,7 @@ export default function LoginPage() {
             required
           />
 
+          {/* Password */}
           <div className="relative mb-6">
             <input
               type={showPassword ? "text" : "password"}
@@ -76,8 +103,9 @@ export default function LoginPage() {
             </span>
           </div>
 
+          {/* Login Button */}
           <Button
-            onClick={handleLogin}
+            type="submit"
             disabled={loading}
             className="w-full text-white py-3 text-lg font-semibold rounded"
             style={{
@@ -118,6 +146,7 @@ export default function LoginPage() {
 
           <div className="my-4 text-center text-gray-500 text-sm">or</div>
 
+          {/* Google Sign In */}
           <Button
             variant="outline"
             onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
@@ -137,8 +166,8 @@ export default function LoginPage() {
               Sign up
             </a>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
-}
+} 

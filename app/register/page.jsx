@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -18,19 +18,31 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = async () => {
-    const strongPasswordRegex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[#@$!%*?&])[A-Za-z\d#@$!%*?&]{8,}$/;
+  const nameRegex = /^[A-Za-z]+$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[#@$!%*?&])[A-Za-z\d#@$!%*?&]{8,}$/;
 
-    if (!strongPasswordRegex.test(password)) {
-      toast.error(
-        "Password must be 8+ characters with uppercase, lowercase, number, and special char."
-      );
+  const handleRegister = async () => {
+    toast.dismiss();
+
+    if (!nameRegex.test(firstName) || !nameRegex.test(lastName)) {
+      toast.error("❌ Name must contain alphabets only");
+      return;
+    }
+
+    if (!emailRegex.test(email)) {
+      toast.error("❌ Invalid email address");
+      return;
+    }
+
+    if (!passwordRegex.test(password)) {
+      toast.error("❌ Password must be 8+ chars with A-Z, a-z, 0-9 & symbol");
       return;
     }
 
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match.");
+      toast.error("❌ Passwords do not match");
       return;
     }
 
@@ -49,13 +61,13 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success("Account created successfully!");
+        toast.success("✅ Account created");
         setTimeout(() => router.push("/login"), 1000);
       } else {
-        toast.error(data.error || "Registration failed.");
+        toast.error(data.error || "❌ Registration failed");
       }
-    } catch (error) {
-      toast.error("Something went wrong. Please try again.");
+    } catch (err) {
+      toast.error("🚫 Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -63,8 +75,9 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <Toaster position="top-center" />
+      {/* ❌ REMOVED DUPLICATE TOASTER */}
 
+      {/* Logo */}
       <div className="p-6 flex items-center gap-3">
         <Image src="/logo.svg" alt="AI Decor" width={40} height={40} />
         <span
@@ -75,8 +88,15 @@ export default function RegisterPage() {
         </span>
       </div>
 
+      {/* Form */}
       <div className="flex-1 flex flex-col items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleRegister();
+          }}
+          className="max-w-md w-full bg-white rounded-xl shadow-lg p-8"
+        >
           <h1
             className="text-3xl font-bold text-center mb-6"
             style={{ color: "oklch(55.8% 0.288 302.321)" }}
@@ -84,6 +104,7 @@ export default function RegisterPage() {
             Create your account
           </h1>
 
+          {/* Name Fields */}
           <div className="flex gap-4 mb-4">
             <input
               type="text"
@@ -103,6 +124,7 @@ export default function RegisterPage() {
             />
           </div>
 
+          {/* Email */}
           <input
             type="email"
             placeholder="Email address"
@@ -124,7 +146,7 @@ export default function RegisterPage() {
             />
             <span
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-600 text-lg"
             >
               {showPassword ? "🙈" : "👁️"}
             </span>
@@ -142,14 +164,15 @@ export default function RegisterPage() {
             />
             <span
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-600 text-lg"
             >
               {showConfirmPassword ? "🙈" : "👁️"}
             </span>
           </div>
 
+          {/* Sign Up Button */}
           <Button
-            onClick={handleRegister}
+            type="submit"
             disabled={loading}
             className="w-full text-white py-3 text-lg font-semibold rounded transition-all duration-200"
             style={{
@@ -188,8 +211,10 @@ export default function RegisterPage() {
             )}
           </Button>
 
+          {/* Divider */}
           <div className="my-4 text-center text-gray-500 text-sm">or</div>
 
+          {/* Google Auth */}
           <Button
             variant="outline"
             onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
@@ -199,6 +224,7 @@ export default function RegisterPage() {
             Continue with Google
           </Button>
 
+          {/* Already Have Account */}
           <div className="text-center text-sm mt-6">
             Already have an account?{" "}
             <a
@@ -209,7 +235,7 @@ export default function RegisterPage() {
               Log in
             </a>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

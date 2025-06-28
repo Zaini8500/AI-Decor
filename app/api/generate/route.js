@@ -6,15 +6,14 @@ import User from "@/models/User";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 
-// Init Replicate
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.email) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
   const formData = await req.formData();
@@ -22,21 +21,22 @@ export async function POST(req) {
   const roomType = formData.get("roomType") || "room";
   const style = formData.get("style") || "modern";
   const userPrompt = formData.get("prompt") || "";
-  const prompt = `A ${roomType} with a ${style} interior style. ${userPrompt}`;
+  const width = formData.get("width") || "";
+  const length = formData.get("length") || "";
+  const unit = formData.get("unit") || "";
 
   if (!file) {
-    return Response.json({ error: "No file uploaded" }, { status: 400 });
+    return new Response(JSON.stringify({ error: "No file uploaded" }), { status: 400 });
   }
 
   await dbConnect();
 
-  // Fetch user from DB
   const user = await User.findOne({ email: session.user.email });
   if (!user || user.credits <= 0) {
-    return Response.json({ error: "Not enough credits" }, { status: 403 });
+    return new Response(JSON.stringify({ error: "Not enough credits" }), { status: 403 });
   }
 
-  // Upload to Cloudinary
+  // Upload image to Cloudinary
   const buffer = Buffer.from(await file.arrayBuffer());
   const cloudinaryUpload = await new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
@@ -48,12 +48,21 @@ export async function POST(req) {
     ).end(buffer);
   });
 
+  // Construct AI prompt
+  let prompt = `A ${roomType} with a ${style} interior style`;
+  if (width && length && unit) {
+    prompt += ` in a ${width}x${length} ${unit} room.`;
+  } else {
+    prompt += ".";
+  }
+  if (userPrompt) prompt += " " + userPrompt;
+
   const input = {
     image: cloudinaryUpload.secure_url,
     prompt,
   };
 
-  // Generate design via Replicate
+  // Generate with Replicate API
   let prediction;
   try {
     prediction = await replicate.predictions.create({
@@ -61,7 +70,6 @@ export async function POST(req) {
       input,
     });
 
-    // Poll until generation is done
     while (
       prediction.status !== "succeeded" &&
       prediction.status !== "failed" &&
@@ -72,40 +80,39 @@ export async function POST(req) {
     }
 
     if (prediction.status !== "succeeded") {
-      return Response.json(
-        { error: "Prediction failed", status: prediction.status },
-        { status: 500 }
-      );
+      return new Response(JSON.stringify({ error: "Prediction failed" }), { status: 500 });
     }
   } catch (err) {
-    console.error("Replicate Prediction Error:", err);
-    return Response.json({ error: "Replicate error", detail: err.message }, { status: 500 });
+    console.error("Replicate Error:", err);
+    return new Response(JSON.stringify({ error: "AI generation failed" }), { status: 500 });
   }
 
   const imageUrl = Array.isArray(prediction.output)
     ? prediction.output[0]
     : prediction.output;
 
-  // Save to MongoDB
+  // ✅ Save design to DB with roomType
   const newImage = new GeneratedImage({
     imageUrl,
     prompt,
     style,
+    roomType, // ✅ save this
     userEmail: session.user.email,
   });
   await newImage.save();
 
-  // Deduct 1 credit after successful generation
+  // ✅ Deduct credit
   await User.updateOne(
     { email: session.user.email },
     { $inc: { credits: -1 } }
   );
 
-  return Response.json({
+  return new Response(JSON.stringify({
     success: true,
     imageUrl,
     uploadedImage: cloudinaryUpload.secure_url,
     prompt,
     style,
-  });
+    roomType,
+  }), { status: 200 });
 }

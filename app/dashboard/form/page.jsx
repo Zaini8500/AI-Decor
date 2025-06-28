@@ -11,16 +11,23 @@ import {
   AlertDialogContent,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 export default function FormPage() {
   const { data: session } = useSession();
   const isAuthenticated = !!session;
+  const router = useRouter();
 
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [selectedStyle, setSelectedStyle] = useState(null);
   const [roomType, setRoomType] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [width, setWidth] = useState("");
+  const [length, setLength] = useState("");
+  const [unit, setUnit] = useState("feet");
+
   const [loading, setLoading] = useState(false);
   const [resultImage, setResultImage] = useState("");
   const [showLoginAlert, setShowLoginAlert] = useState(false);
@@ -50,8 +57,8 @@ export default function FormPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!imageFile || !selectedStyle) {
-      alert("Please upload an image and select a design style.");
+    if (!imageFile || !selectedStyle || !roomType || !width || !length) {
+      toast.error("Please complete all required fields.");
       return;
     }
 
@@ -68,6 +75,9 @@ export default function FormPage() {
     formData.append("style", selectedStyle);
     formData.append("prompt", prompt);
     formData.append("roomType", roomType);
+    formData.append("width", width);
+    formData.append("length", length);
+    formData.append("unit", unit);
 
     try {
       const res = await fetch("/api/generate", {
@@ -79,10 +89,15 @@ export default function FormPage() {
       if (data?.imageUrl) {
         setResultImage(data.imageUrl);
       } else {
-        alert("Failed to generate image.");
+        if (data?.error === "Not enough credits") {
+          toast.error("You have no credits left to generate an image.");
+          setTimeout(() => router.push("/plans"), 2000); // Redirect to Buy Credits
+        } else {
+          toast.error("Failed to generate image.");
+        }
       }
     } catch (error) {
-      alert("Something went wrong.");
+      toast.error("Something went wrong.");
       console.error("Generation error:", error);
     } finally {
       setLoading(false);
@@ -93,70 +108,29 @@ export default function FormPage() {
     <>
       {loading && <Customloading loading={loading} />}
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col items-center justify-center p-10"
-      >
+      <form onSubmit={handleSubmit} className="flex flex-col items-center justify-center p-10">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-purple-700">
-            Experience the Magic of AI Remodeling
-          </h1>
+          <h1 className="text-3xl font-bold text-purple-700">Experience the Magic of AI Remodeling</h1>
           <p className="text-gray-600 mt-2 text-sm max-w-2xl mx-auto">
-            Transform any room with a click. Select a space, choose a style, and
-            watch as AI instantly redesigns your environment.
+            Transform any room with a click. Select a space, choose a style, add dimensions, and watch AI redesign your space.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 w-full max-w-6xl">
-          {/* Upload + Camera */}
+          {/* Upload Section */}
           <div className="space-y-6">
-            <label className="block font-semibold text-left">
-              Upload Image of your room
-            </label>
-
+            <label className="block font-semibold text-left">Upload Image of your room</label>
             <div className="flex gap-4 flex-wrap items-center">
-              <Button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-purple-600 text-white hover:bg-black"
-              >
-                Upload Image
-              </Button>
+              <Button type="button" onClick={() => fileInputRef.current?.click()} className="bg-purple-600 text-white hover:bg-black">Upload Image</Button>
+              <Button type="button" onClick={() => cameraInputRef.current?.click()} className="bg-purple-600 text-white hover:bg-black">Use Camera</Button>
 
-              <Button
-                type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="bg-purple-600 text-white hover:bg-black"
-              >
-                Use Camera
-              </Button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="hidden"
-              />
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageChange}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageChange} className="hidden" />
             </div>
 
             <div className="border w-full h-64 bg-gray-100 flex items-center justify-center rounded-md">
               {imagePreview ? (
-                <Image
-                  src={imagePreview}
-                  width={300}
-                  height={300}
-                  alt="Preview"
-                  className="object-cover h-full rounded-md"
-                />
+                <Image src={imagePreview} width={300} height={300} alt="Preview" className="object-cover h-full rounded-md" />
               ) : (
                 <p className="text-gray-400">Image Preview</p>
               )}
@@ -167,11 +141,7 @@ export default function FormPage() {
           <div className="space-y-6">
             <div>
               <label className="block font-semibold mb-1">Select Room Type</label>
-              <select
-                value={roomType}
-                onChange={(e) => setRoomType(e.target.value)}
-                className="w-full border px-3 py-2 rounded-md"
-              >
+              <select value={roomType} onChange={(e) => setRoomType(e.target.value)} className="w-full border px-3 py-2 rounded-md">
                 <option value="">-- Select --</option>
                 <option>Living Room</option>
                 <option>Bedroom</option>
@@ -189,22 +159,49 @@ export default function FormPage() {
                     key={style.name}
                     onClick={() => handleStyleSelect(style.name)}
                     className={`cursor-pointer border rounded-md p-2 transition ${
-                      selectedStyle === style.name
-                        ? "border-purple-600 ring-2 ring-purple-400"
-                        : "border-gray-200"
+                      selectedStyle === style.name ? "border-purple-600 ring-2 ring-purple-400" : "border-gray-200"
                     }`}
                   >
-                    <Image
-                      src={style.src}
-                      alt={style.name}
-                      width={100}
-                      height={100}
-                      className="rounded-md mx-auto hover:scale-105 transition-transform"
-                    />
+                    <Image src={style.src} alt={style.name} width={100} height={100} className="rounded-md mx-auto hover:scale-105 transition-transform" />
                     <p className="text-xs mt-1 text-center font-medium">{style.name}</p>
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold mb-1">Room Width</label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="e.g., 12"
+                  value={width}
+                  onChange={(e) => setWidth(e.target.value)}
+                  className="w-full border px-3 py-2 rounded-md"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Room Length</label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="e.g., 14"
+                  value={length}
+                  onChange={(e) => setLength(e.target.value)}
+                  className="w-full border px-3 py-2 rounded-md"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">Measurement Unit</label>
+              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full border px-3 py-2 rounded-md">
+                <option value="feet">Feet</option>
+                <option value="meters">Meters</option>
+              </select>
             </div>
 
             <div>
@@ -217,39 +214,25 @@ export default function FormPage() {
               />
             </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-purple-600 text-white hover:bg-black"
-              disabled={loading}
-            >
+            <Button type="submit" className="w-full bg-purple-600 text-white hover:bg-black" disabled={loading}>
               {loading ? "Generating..." : "Generate"}
             </Button>
           </div>
         </div>
       </form>
 
-      {/* Modal */}
       {isAuthenticated && resultImage && (
-        <GeneratedImageModal
-          imageUrl={resultImage}
-          onClose={() => setResultImage("")}
-        />
+        <GeneratedImageModal imageUrl={resultImage} onClose={() => setResultImage("")} />
       )}
 
-      {/* Alert Dialog */}
       <AlertDialog open={showLoginAlert} onOpenChange={setShowLoginAlert}>
         <AlertDialogContent>
           <AlertDialogTitle>Please login first</AlertDialogTitle>
-          <p className="text-gray-600">
-            You must be logged in and have credits to generate designs.
-          </p>
-          <Button
-            className="mt-4 bg-purple-600 text-white hover:bg-black"
-            onClick={() => {
-              setShowLoginAlert(false);
-              window.location.href = "/login";
-            }}
-          >
+          <p className="text-gray-600">You must be logged in and have credits to generate designs.</p>
+          <Button className="mt-4 bg-purple-600 text-white hover:bg-black" onClick={() => {
+            setShowLoginAlert(false);
+            router.push("/login");
+          }}>
             Go to Login
           </Button>
         </AlertDialogContent>

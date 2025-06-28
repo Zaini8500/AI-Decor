@@ -16,7 +16,7 @@ export default function RootLayout({ children }) {
           <main className="min-h-screen w-full max-w-[100vw] overflow-x-hidden px-4 sm:px-6 md:px-8">
             {children}
           </main>
-          <Toaster position="top-right" />
+          <Toaster position="top-center"/>
         </Providers>
       </body>
     </html>

@@ -1,32 +1,51 @@
-// app/api/admin/reports/route.js
-
+// /app/api/admin/reports/route.js
 import dbConnect from "@/lib/dbConnect";
 import GeneratedImage from "@/models/GeneratedImage";
 import Payment from "@/models/Payment";
 
-export async function GET() {
-  try {
-    await dbConnect();
+export async function GET(req) {
+  await dbConnect();
 
-    const totalDesigns = await GeneratedImage.countDocuments();
+  const { searchParams } = new URL(req.url);
+  const type = searchParams.get("type");
+  const date = searchParams.get("date");
+  const email = searchParams.get("email");
+  const roomType = searchParams.get("roomType");
+  const style = searchParams.get("style");
 
-    const payments = await Payment.find().sort({ date: -1 }).limit(10);
-    const totalPaymentsAgg = await Payment.aggregate([
-      { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
-    const totalAmount = totalPaymentsAgg[0]?.total || 0;
+  let result = [];
 
-    return Response.json({
-      totalDesigns,
-      totalPayments: totalAmount,
-      recentPayments: payments.map((p) => ({
-        email: p.email,
-        amount: p.amount,
-        date: p.date,
-      })),
+  if (type === "design") {
+    const allDesigns = await GeneratedImage.find({}).sort({ createdAt: -1 });
+
+    result = allDesigns.filter((item) => {
+      const emailMatch = !email || item.userEmail === email;
+      const styleMatch = !style || item.style === style;
+      const dateMatch = !date || (
+        new Date(item.createdAt).toDateString() === new Date(date).toDateString()
+      );
+
+      const roomMatch =
+        !roomType ||
+        item.roomType?.toLowerCase() === roomType.toLowerCase() ||
+        (item.prompt?.toLowerCase().includes(roomType.toLowerCase()));
+
+      return emailMatch && styleMatch && dateMatch && roomMatch;
     });
-  } catch (err) {
-    console.error("❌ Report fetch error:", err);
-    return new Response("Error fetching report", { status: 500 });
   }
+
+  if (type === "payment") {
+    const query = {};
+    if (email) query.email = email;
+    if (date) {
+      const start = new Date(date);
+      const end = new Date(date);
+      end.setDate(end.getDate() + 1);
+      query.createdAt = { $gte: start, $lt: end };
+    }
+
+    result = await Payment.find(query).sort({ createdAt: -1 });
+  }
+
+  return Response.json({ success: true, result });
 }

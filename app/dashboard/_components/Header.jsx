@@ -4,13 +4,14 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function Header() {
   const { data: session } = useSession();
   const isLoggedIn = !!session?.user;
   const [credits, setCredits] = useState(0);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const fetchCredits = async () => {
@@ -37,9 +38,15 @@ export default function Header() {
     router.push("/admin/login");
   };
 
+  const handleGoToDashboard = () => {
+    router.push("/dashboard");
+  };
+
+  const userInitial = session?.user?.name?.charAt(0)?.toUpperCase() || "U";
+
   return (
     <header className="fixed top-0 w-full z-50 bg-white shadow flex justify-between items-center px-8 py-4 border-b">
-      {/* Logo */}
+      {/* Logo + Name */}
       <div className="flex items-center gap-3 font-semibold text-lg">
         <Image src="/logo.svg" alt="Logo" width={30} height={30} />
         <span>AI DECOR</span>
@@ -54,8 +61,19 @@ export default function Header() {
         Buy Credits
       </Button>
 
-      {/* User Controls */}
+      {/* Right Controls */}
       <div className="flex items-center gap-3">
+        {/* Dashboard Button */}
+        {isLoggedIn && pathname === "/dashboard/form" && (
+          <Button
+            onClick={handleGoToDashboard}
+            variant="outline"
+            className="text-sm"
+          >
+            Dashboard
+          </Button>
+        )}
+
         {/* Credits */}
         {isLoggedIn && (
           <div className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-sm">
@@ -64,19 +82,17 @@ export default function Header() {
           </div>
         )}
 
-        {/* Avatar */}
-        <div className="bg-purple-600 w-8 h-8 text-white flex justify-center items-center rounded-full font-semibold">
-          {isLoggedIn ? session.user.name?.charAt(0) : "G"}
-        </div>
-
         {/* Auth Buttons */}
         {!isLoggedIn ? (
           <>
             <Button
               onClick={() => signIn()}
               variant="outline"
-              className="text-sm"
+              className="text-sm flex items-center gap-2"
             >
+              <div className="bg-purple-600 w-6 h-6 text-white flex justify-center items-center rounded-full text-xs">
+                G
+              </div>
               Login
             </Button>
             <Button
@@ -88,7 +104,14 @@ export default function Header() {
             </Button>
           </>
         ) : (
-          <Button onClick={() => signOut()} variant="outline" className="text-sm">
+          <Button
+            onClick={() => signOut()}
+            variant="outline"
+            className="text-sm flex items-center gap-2"
+          >
+            <div className="bg-purple-600 w-6 h-6 text-white flex justify-center items-center rounded-full text-xs">
+              {userInitial}
+            </div>
             Sign Out
           </Button>
         )}
