@@ -1,11 +1,24 @@
+import withPWA from "next-pwa";
+
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+const baseConfig = {
+  reactStrictMode: true,
+  experimental: {
+    serverActions: true,
+  },
   images: {
     domains: [
       "res.cloudinary.com",
-      "replicate.delivery", // ✅ Required for Replicate output images
+      "replicate.delivery",
     ],
   },
 };
 
-export default nextConfig;
+const pwaConfig = {
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === "development", // Only enable in production
+};
+
+export default withPWA(pwaConfig)(baseConfig);
