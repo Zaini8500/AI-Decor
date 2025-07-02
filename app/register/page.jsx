@@ -148,7 +148,7 @@ export default function RegisterPage() {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-600 text-lg"
             >
-              {showPassword ? "🙈" : "👁️"}
+  
             </span>
           </div>
 
@@ -162,12 +162,6 @@ export default function RegisterPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
-            <span
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-600 text-lg"
-            >
-              {showConfirmPassword ? "🙈" : "👁️"}
-            </span>
           </div>
 
           {/* Sign Up Button */}

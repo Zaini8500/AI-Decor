@@ -71,11 +71,25 @@ function DashboardContent() {
     fetchData();
   }, [status, session]);
 
-  const handleDownload = (url) => {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "design.jpg";
-    link.click();
+  // ✅ New: Proper download handler
+  const handleDownload = async (url) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `design-${Date.now()}.jpg`; // You can customize this
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("❌ Download failed:", error);
+      alert("Download failed. Please try again.");
+    }
   };
 
   const handlePreview = (url) => {

@@ -11,7 +11,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -75,7 +74,6 @@ export default function LoginPage() {
             Welcome back
           </h1>
 
-          {/* Email */}
           <input
             type="email"
             placeholder="Email address"
@@ -85,68 +83,30 @@ export default function LoginPage() {
             required
           />
 
-          {/* Password */}
-          <div className="relative mb-6">
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              className="w-full border border-gray-300 rounded px-4 py-3 pr-10"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <span
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-600 text-xl"
-            >
-              {showPassword ? "🙈" : "👁️"}
-            </span>
-          </div>
+          <input
+            type="password"
+            placeholder="Password"
+            className="w-full border border-gray-300 rounded px-4 py-3 mb-6"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
-          {/* Login Button */}
           <Button
             type="submit"
             disabled={loading}
             className="w-full text-white py-3 text-lg font-semibold rounded"
-            style={{
-              backgroundColor: "oklch(55.8% 0.288 302.321)",
-            }}
+            style={{ backgroundColor: "oklch(55.8% 0.288 302.321)" }}
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#000")}
             onMouseLeave={(e) =>
               (e.currentTarget.style.backgroundColor = "oklch(55.8% 0.288 302.321)")
             }
           >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg
-                  className="animate-spin h-5 w-5 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v8z"
-                  />
-                </svg>
-                Logging in...
-              </span>
-            ) : (
-              "Log in"
-            )}
+            {loading ? "Logging in..." : "Log in"}
           </Button>
 
           <div className="my-4 text-center text-gray-500 text-sm">or</div>
 
-          {/* Google Sign In */}
           <Button
             variant="outline"
             onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
@@ -170,4 +130,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-} 
+}

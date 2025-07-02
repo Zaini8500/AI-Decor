@@ -106,7 +106,12 @@ export default function FormPage() {
 
   return (
     <>
-      {loading && <Customloading loading={loading} />}
+        {/* ✅ Loading overlay */}
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
+          <img src="/loading.gif" alt="Loading..." className="w-24 h-24" />
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col items-center justify-center p-10">
         <div className="text-center mb-10">
