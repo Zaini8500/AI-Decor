@@ -39,40 +39,16 @@ export async function POST(req) {
     return new Response(JSON.stringify({ error: "Not enough credits" }), { status: 403 });
   }
 
-  // Upload original room image to Cloudinary
+  // Upload room image to Cloudinary
   const buffer = Buffer.from(await file.arrayBuffer());
   const uploadedOriginal = await new Promise((resolve, reject) => {
-    cloudinary.uploader.upload_stream(
-      { resource_type: "image" },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    ).end(buffer);
+    cloudinary.uploader.upload_stream({ resource_type: "image" }, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    }).end(buffer);
   });
 
-  // Read MiDaS depth image
-  const depthPath = path.join("output", "input-dpt_beit_large_512.png");
-  let depthBuffer;
-  try {
-    depthBuffer = await fs.readFile(depthPath);
-  } catch (err) {
-    console.error("❌ Failed to read depth image:", err);
-    return new Response(JSON.stringify({ error: "Depth image not found. Make sure MiDaS ran successfully." }), { status: 500 });
-  }
-
-  // Upload depth image to Cloudinary
-  const uploadedDepth = await new Promise((resolve, reject) => {
-    cloudinary.uploader.upload_stream(
-      { resource_type: "image" },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    ).end(depthBuffer);
-  });
-
-  // 🔥 Build AI Prompt
+  // Construct AI Prompt
   let prompt = `Interior design of a ${roomType.toLowerCase()} styled in ${style.toLowerCase()} decor.`;
   if (width && length && unit) {
     prompt += ` The room dimensions are approximately ${width} by ${length} ${unit}.`;
@@ -83,16 +59,39 @@ export async function POST(req) {
 
   console.log("🧠 Final AI Prompt:", prompt);
 
-  // 🔮 Call Replicate (ControlNet + SDXL)
+  let depthUrl = null;
+  const isLocalhost = process.env.NODE_ENV !== "production";
+
+  if (isLocalhost) {
+    try {
+      const depthPath = path.join("output", "input-dpt_beit_large_512.png");
+      const depthBuffer = await fs.readFile(depthPath);
+
+      const uploadedDepth = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream({ resource_type: "image" }, (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }).end(depthBuffer);
+      });
+
+      depthUrl = uploadedDepth.secure_url;
+    } catch (err) {
+      console.warn("⚠ Depth image not found locally. Proceeding without depth.");
+    }
+  }
+
+  // Generate image with Replicate
   let prediction;
   try {
+    const input = {
+      image: uploadedOriginal.secure_url,
+      prompt,
+      ...(depthUrl && { depth_map: depthUrl }),
+    };
+
     prediction = await replicate.predictions.create({
-      version: "06d6fae3b75ab68a28cd2900afa6033166910dd09fd9751047043a5bbb4c184b", // lucataco model
-      input: {
-        image: uploadedOriginal.secure_url,
-        depth_map: uploadedDepth.secure_url,
-        prompt,
-      },
+      version: "06d6fae3b75ab68a28cd2900afa6033166910dd09fd9751047043a5bbb4c184b", // Lucataco ControlNet + SDXL
+      input,
     });
 
     while (
@@ -108,11 +107,11 @@ export async function POST(req) {
       return new Response(JSON.stringify({ error: "AI generation failed" }), { status: 500 });
     }
   } catch (err) {
-    console.error("🔥 Replicate Error:", err);
+    console.error("🔥 Replicate API error:", err);
     return new Response(JSON.stringify({ error: "Replicate API error" }), { status: 500 });
   }
 
-  // ⬇ Download generated image
+  // Download result image
   const replicateImageUrl = Array.isArray(prediction.output)
     ? prediction.output[0]
     : prediction.output;
@@ -122,38 +121,31 @@ export async function POST(req) {
     const response = await axios.get(replicateImageUrl, { responseType: "arraybuffer" });
     imageBuffer = response.data;
   } catch (err) {
-    console.error("❌ Failed to download image from Replicate:", err);
+    console.error("❌ Failed to download image:", err);
     return new Response(JSON.stringify({ error: "Image download failed" }), { status: 500 });
   }
 
-  // 🔼 Upload final image to Cloudinary
+  // Upload final image to Cloudinary
   const uploadedFinal = await new Promise((resolve, reject) => {
-    cloudinary.uploader.upload_stream(
-      { resource_type: "image" },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    ).end(imageBuffer);
+    cloudinary.uploader.upload_stream({ resource_type: "image" }, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    }).end(imageBuffer);
   });
 
   const finalImageUrl = uploadedFinal.secure_url;
 
-  // 💾 Save in DB
-  const newImage = new GeneratedImage({
+  // Save to DB
+  await new GeneratedImage({
     imageUrl: finalImageUrl,
     prompt,
     style,
     roomType,
     userEmail: session.user.email,
-  });
-  await newImage.save();
+  }).save();
 
-  // ➖ Deduct 1 credit
-  await User.updateOne(
-    { email: session.user.email },
-    { $inc: { credits: -1 } }
-  );
+  // Deduct 1 credit
+  await User.updateOne({ email: session.user.email }, { $inc: { credits: -1 } });
 
   return new Response(JSON.stringify({
     success: true,
